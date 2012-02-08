@@ -1,10 +1,19 @@
+/* Constructing the ID3 Decision Tree for Machine Learning problems */
+/* Author: Harihara K Narayanan - Grad Student, Texas A&M University */
+
 package ml;
  
 import java.io.*;
 import java.lang.reflect.Array;
+import java.lang.Integer;
+import java.lang.Float;
+import java.lang.Math;
 import java.util.TreeSet;
 import java.util.LinkedList;
-import java.lang.Integer;
+import java.util.HashMap;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
  
 public class ID3
 {
@@ -24,11 +33,77 @@ public class ID3
 			
 		}
 		
-		private static int getInformationGain(int[] testCases, int attributeIndex)
+		private static float getEntropy(int[] testCases)//Calculate the entropy of the given testCases. 
 		{
+			 HashMap hMap = new HashMap();
+			 String classLabel;
+			 int occ;
+			 BigDecimal answer = BigDecimal.ZERO;
+			 BigDecimal fraction;
 			 
+			 for(int i=0; i<Array.getLength(testCases); i++)
+			 {
+				 classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][n];
+				 
+				 if(hMap.containsValue(classLabel))
+				 {
+					 occ = new Integer(hMap.get(classLabel).toString).intValue();
+					 hMap.remove(classLabel);
+					 hMap.put(classLabel, new Integer(occ+1));
+				 }
+				 else
+					 hMap.put(classLabel, new Integer("1"));
+			}
+			
+			for(String key : hMap.keySet())
+			{
+				fraction = new BigDecimal(hMap.get(key).toString()).divide(new BigDecimal(Array.getLength(testCases)), 2, RoundingMode.HALF_DOWN);
+				fraction = fraction.multiply(new BigDecimal(Math.log(fraction.doubleValue())));
+				answer = answer + (fraction.negate());
+			}
+			return answer.floatValue();	 	 
+		}
+			 
+		private static float getInformationGain(int[] testCases, int attributeIndex)//Calculate the Information Gain if we split by attributeIndex for the given testCases.
+		{
+			HashMap hMap = new HashMap();
+			String classLabel, indexes;
+			BigDecimal answer = BigDecimal.ZERO;
+			
+			for(i=0; i<Array.length(testCases); i++)
+			{
+				classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][attribute_index];
+				
+				if(hMap.contains(classLabel))
+				{
+					indexes = hMap.get(classLabel).toString();
+					indexes = indexes.append(";"+String.valueOf(i))
+					hMap.put(classLabel, indexes); 
+				}
+				
+				else
+					hMap.put(classLabel, String.valueOf(i));
+			}
+			
+			int[] allTestCases;
+			String[] result;
+			
+			for(String key: hMap.keySet())
+			{
+				result = hMap.get(key).toString().split(";");
+				allTestCases = new int[Array.length(result)];
+				
+				for(i=0; i<Array.length(result); i++)
+					allTestCases[i] = new Integer(result[i]).intValue();
+				
+				answer = answer.add(new BigDecimal(getEntropy(allTestCases)));
+			}		
+			
+			answer = answer.subtract(new BigDecimal(getEntropy(testCases));
+			return answer.floatValue();
 			
 		}
+		
 		
 		private class TreeNode //Decision Tree data structure.
 		{
@@ -56,6 +131,8 @@ public class ID3
 			
 			void findSplitAttribute() //Find the best splitAttribute - using Information Gain theory.
 			{
+				float max = FLOAT.MIN_VALUE;
+				
 							
 				
 			}
