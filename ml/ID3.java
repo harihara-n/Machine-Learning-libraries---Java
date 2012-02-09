@@ -18,16 +18,22 @@ import java.util.Stack;
 import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-
  
 public class ID3
 {
 		private static String[][]input;
 		private static int n,t; //number of attributes and number of test_cases;
-		
+		private static String fileName;
 		private static LinkedList unusedAttr = new LinkedList();
 		
-		private static int countInstances (int[] testCases, int attributeIndex) //Counts the number of unique values of a particular attribute over the given testcases. 
+		public ID3(String fName, int numAttributes, int testCases)
+		{
+			fileName = fName;
+			n = numAttributes;
+			t = testCases;
+		}
+		
+		private int countInstances (int[] testCases, int attributeIndex) //Counts the number of unique values of a particular attribute over the given testcases. 
 		{
 			TreeSet ts = new TreeSet();
 			
@@ -37,7 +43,7 @@ public class ID3
 			return ts.size();		
 		}
 		
-		private static TreeSet getInstances(int [] testCases, int attributeIndex)//Returns an instance TreeSet containing all instances.
+		private TreeSet getInstances(int [] testCases, int attributeIndex)//Returns an instance TreeSet containing all instances.
 		{
 			TreeSet ts = new TreeSet();
 			
@@ -47,7 +53,7 @@ public class ID3
 			return ts;	
 		}
 		
-		private static float getEntropy(int[] testCases)//Calculate the entropy of the given testCases. 
+		private float getEntropy(int[] testCases)//Calculate the entropy of the given testCases. 
 		{
 			 HashMap hMap = new HashMap();
 			 String classLabel;
@@ -80,7 +86,7 @@ public class ID3
 			return answer.floatValue();	 	 
 		}
 			 
-		private static float getInformationGain(int[] testCases, int attributeIndex)//Calculate the Information Gain if we split by attributeIndex for the given testCases.
+		private float getInformationGain(int[] testCases, int attributeIndex)//Calculate the Information Gain if we split by attributeIndex for the given testCases.
 		{
 			HashMap hMap = new HashMap();
 			String classLabel, indexes;
@@ -122,7 +128,6 @@ public class ID3
 			return answer.floatValue();
 			
 		}
-		
 		
 		private class TreeNode //Decision Tree data structure.
 		{
@@ -172,28 +177,25 @@ public class ID3
 			
 		}
 		
-		public void createDecisionTree(String filename, int numAttributes, int testCases, boolean randomize) throws FileNotFoundException, IOException //Build Decision Tree for input.
+		public void createDecisionTree() throws FileNotFoundException, IOException //Build Decision Tree for input.
         {
-                FileInputStream fstream = new FileInputStream(filename);
+                FileInputStream fstream = new FileInputStream(fileName);
                 DataInputStream in = new DataInputStream(fstream);
                 
                 //Parse the first line to see if continuous or discrete attributes. 
                 //To be done later.
-                
-                n = numAttributes;
-                t = testCases;
  
                 int i, j, lineCount = 0;
                 for(i=0; i<n; i++)
 					unusedAttr.add(new Integer(i));
                 
-                input = new String[testCases][numAttributes+1];
+                input = new String[t][n+1];
                 String line;
                 
-                while(lineCount<testCases)
+                while(lineCount<t)
                 {
 					input[lineCount] = (in.readLine()).split(",");
-					if (Array.getLength(input[lineCount]) != numAttributes+1) //number of attributes provided in the line is incorrect. 
+					if (Array.getLength(input[lineCount]) != n+1) //number of attributes provided in the line is incorrect. 
 					{
 						System.out.println("Invalid data entry");
 						System.exit(0);
@@ -201,8 +203,8 @@ public class ID3
 					lineCount++;
                 }
                 
-                int[] cases = new int[testCases];
-                for(i=0;i<testCases;i++)
+                int[] cases = new int[t];
+                for(i=0;i<t;i++)
 					cases[i] = i;
                 
                 //Start constructing the tree.
@@ -219,7 +221,7 @@ public class ID3
                 {
 					TreeNode tempNode = treeStack.pop();
 					
-					if(countInstances(tempNode.testCases, numAttributes) == 1)
+					if(countInstances(tempNode.testCases, n) == 1)
 						continue;
 										
 					tempNode.findSplitAttribute();
@@ -229,14 +231,13 @@ public class ID3
 					tempSize = tempSet.size();
 					tempNode.childPtr = new TreeNode [tempSize]; //Create as many child nodes as there are categories in the splitAttribute.					
 					
-					for(i=0; i<tempSize; i++) 
+					for(i=0; i<t; i++) 
 					{
 							tempList = new ArrayList();
-							for(j=0; j<testCases; j++)
+							for(j=0; j<t; j++)
 							{
-								if (input[j][numAttributes] == tempSet.first())
+								if (input[j][n] == tempSet.first())
 									tempList.add(j);
-									
 							}
 							
 							tempArray = new int[tempList.size()];
