@@ -11,6 +11,11 @@ import java.lang.Math;
 import java.util.TreeSet;
 import java.util.LinkedList;
 import java.util.HashMap;
+import java.util.ListIterator;
+import java.util.Iterator;
+import java.util.Collection;
+import java.util.Stack;
+import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -30,7 +35,16 @@ public class ID3
 				ts.add(input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex]);
 			
 			return ts.size();		
+		}
+		
+		private static TreeSet getInstances(int [] testCases, int attributeIndex)//Returns an instance TreeSet containing all instances.
+		{
+			TreeSet ts = new TreeSet();
 			
+			for(int i = 0; i<Array.getLength(testCases); i++)
+				ts.add(input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex]);
+				
+			return ts;	
 		}
 		
 		private static float getEntropy(int[] testCases)//Calculate the entropy of the given testCases. 
@@ -47,19 +61,21 @@ public class ID3
 				 
 				 if(hMap.containsValue(classLabel))
 				 {
-					 occ = new Integer(hMap.get(classLabel).toString).intValue();
+					 occ = new Integer(hMap.get(classLabel).toString()).intValue();
 					 hMap.remove(classLabel);
 					 hMap.put(classLabel, new Integer(occ+1));
 				 }
 				 else
 					 hMap.put(classLabel, new Integer("1"));
 			}
+			Collection hColl = hMap.values();
+			Iterator hIt = hColl.iterator();
 			
-			for(String key : hMap.keySet())
+			while(hIt.hasNext())
 			{
-				fraction = new BigDecimal(hMap.get(key).toString()).divide(new BigDecimal(Array.getLength(testCases)), 2, RoundingMode.HALF_DOWN);
+				fraction = new BigDecimal(hIt.next().toString()).divide(new BigDecimal(Array.getLength(testCases)), 2, RoundingMode.HALF_DOWN);
 				fraction = fraction.multiply(new BigDecimal(Math.log(fraction.doubleValue())));
-				answer = answer + (fraction.negate());
+				answer = answer.add(fraction.negate());
 			}
 			return answer.floatValue();	 	 
 		}
@@ -69,15 +85,16 @@ public class ID3
 			HashMap hMap = new HashMap();
 			String classLabel, indexes;
 			BigDecimal answer = BigDecimal.ZERO;
+			int i;
 			
-			for(i=0; i<Array.length(testCases); i++)
+			for(i=0; i<Array.getLength(testCases); i++)
 			{
-				classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][attribute_index];
+				classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex];
 				
-				if(hMap.contains(classLabel))
+				if(hMap.containsKey(classLabel))
 				{
 					indexes = hMap.get(classLabel).toString();
-					indexes = indexes.append(";"+String.valueOf(i))
+					indexes = indexes.concat(";"+String.valueOf(i));
 					hMap.put(classLabel, indexes); 
 				}
 				
@@ -88,18 +105,20 @@ public class ID3
 			int[] allTestCases;
 			String[] result;
 			
-			for(String key: hMap.keySet())
+			Collection hColl = hMap.values();
+			Iterator hIt = hColl.iterator();
+			while(hIt.hasNext())
 			{
-				result = hMap.get(key).toString().split(";");
-				allTestCases = new int[Array.length(result)];
+				result = hIt.next().toString().split(";");
+				allTestCases = new int[Array.getLength(result)];
 				
-				for(i=0; i<Array.length(result); i++)
+				for(i=0; i<Array.getLength(result); i++)
 					allTestCases[i] = new Integer(result[i]).intValue();
 				
 				answer = answer.add(new BigDecimal(getEntropy(allTestCases)));
 			}		
 			
-			answer = answer.subtract(new BigDecimal(getEntropy(testCases));
+			answer = answer.subtract(new BigDecimal(getEntropy(testCases)));
 			return answer.floatValue();
 			
 		}
@@ -131,15 +150,29 @@ public class ID3
 			
 			void findSplitAttribute() //Find the best splitAttribute - using Information Gain theory.
 			{
-				float max = FLOAT.MIN_VALUE;
+				float max = Float.MIN_VALUE;
+				float val;
+				int finalAttribute = -1, attribute;
 				
-							
+				ListIterator lIt = unusedAttr.listIterator();
 				
+				while(lIt.hasNext())
+				{
+					attribute = new Integer(lIt.next().toString()).intValue();
+					val = getInformationGain(testCases, attribute);
+					if (val>max)
+					{
+						max = val;
+						finalAttribute = attribute;
+					}
+				}
+				
+				splitAttribute = finalAttribute;
 			}
 			
 		}
 		
-		public static void createDecisionTree(String filename, int numAttributes, int testCases, boolean randomize) throws FileNotFoundException, IOException //Build Decision Tree for input.
+		public void createDecisionTree(String filename, int numAttributes, int testCases, boolean randomize) throws FileNotFoundException, IOException //Build Decision Tree for input.
         {
                 FileInputStream fstream = new FileInputStream(filename);
                 DataInputStream in = new DataInputStream(fstream);
@@ -150,7 +183,7 @@ public class ID3
                 n = numAttributes;
                 t = testCases;
  
-                int i, lineCount = 0;
+                int i, j, lineCount = 0;
                 for(i=0; i<n; i++)
 					unusedAttr.add(new Integer(i));
                 
@@ -168,13 +201,56 @@ public class ID3
 					lineCount++;
                 }
                 
+                int[] cases = new int[testCases];
+                for(i=0;i<testCases;i++)
+					cases[i] = i;
+                
                 //Start constructing the tree.
-                //TreeNode node = new TreeNode(          
+                Stack<TreeNode> treeStack = new Stack<TreeNode>();
+                TreeNode node = new TreeNode(cases);
+                node.parentPtr = null;
+                TreeSet tempSet;
+                ArrayList tempList;
+                int tempSize;
+				int[] tempArray;	
+                treeStack.push(node);
                 
-                
-                
-                
-                
- 
-        }
+                while(!treeStack.isEmpty() && unusedAttr.size()>0)
+                {
+					TreeNode tempNode = treeStack.pop();
+					
+					if(countInstances(tempNode.testCases, numAttributes) == 1)
+						continue;
+										
+					tempNode.findSplitAttribute();
+					unusedAttr.remove(new Integer(tempNode.splitAttribute));
+										
+					tempSet = getInstances(tempNode.testCases, tempNode.splitAttribute);
+					tempSize = tempSet.size();
+					tempNode.childPtr = new TreeNode [tempSize]; //Create as many child nodes as there are categories in the splitAttribute.					
+					
+					for(i=0; i<tempSize; i++) 
+					{
+							tempList = new ArrayList();
+							for(j=0; j<testCases; j++)
+							{
+								if (input[j][numAttributes] == tempSet.first())
+									tempList.add(j);
+									
+							}
+							
+							tempArray = new int[tempList.size()];
+							
+							for(j=0; j<tempList.size(); j++)
+								tempArray[j] = new Integer(tempList.get(j).toString()).intValue();
+								
+							
+							TreeNode tempNode2 = new TreeNode(tempArray);
+							tempNode2.parentPtr = tempNode;
+							treeStack.push(tempNode2);
+							tempSet.remove(tempSet.first());
+					}
+										
+				}
+         }
 }
