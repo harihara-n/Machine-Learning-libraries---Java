@@ -6,7 +6,7 @@ package ml;
 import java.io.*;
 import java.lang.reflect.Array;
 import java.lang.Integer;
-import java.lang.Float;
+import java.lang.Long;
 import java.lang.Math;
 import java.util.TreeSet;
 import java.util.LinkedList;
@@ -18,13 +18,16 @@ import java.util.Stack;
 import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.awt.*;
  
 public class ID3
 {
 		private static String[][]input;
 		private static int n,t; //number of attributes and number of test_cases;
 		private static String fileName;
+		private static TreeNode root;
 		private static LinkedList unusedAttr = new LinkedList();
+
 		
 		public ID3(String fName, int numAttributes, int testCases)
 		{
@@ -38,7 +41,7 @@ public class ID3
 			TreeSet ts = new TreeSet();
 			
 			for(int i = 0; i<Array.getLength(testCases); i++)
-				ts.add(input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex]);
+				ts.add(input[testCases[i]][attributeIndex]);
 			
 			return ts.size();		
 		}
@@ -48,7 +51,7 @@ public class ID3
 			TreeSet ts = new TreeSet();
 			
 			for(int i = 0; i<Array.getLength(testCases); i++)
-				ts.add(input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex]);
+				ts.add(input[testCases[i]][attributeIndex]);
 				
 			return ts;	
 		}
@@ -63,9 +66,9 @@ public class ID3
 			 
 			 for(int i=0; i<Array.getLength(testCases); i++)
 			 {
-				 classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][n];
+				 classLabel = input[testCases[i]][n];
 				 
-				 if(hMap.containsValue(classLabel))
+				 if(hMap.containsKey(classLabel))
 				 {
 					 occ = new Integer(hMap.get(classLabel).toString()).intValue();
 					 hMap.remove(classLabel);
@@ -95,7 +98,7 @@ public class ID3
 			
 			for(i=0; i<Array.getLength(testCases); i++)
 			{
-				classLabel = input[new Integer(Array.get(testCases,i).toString()).intValue()][attributeIndex];
+				classLabel = input[testCases[i]][attributeIndex];
 				
 				if(hMap.containsKey(classLabel))
 				{
@@ -137,10 +140,12 @@ public class ID3
 			TreeNode childPtr[];
 			TreeNode parentPtr;
 			
+			String parentLabel;
+			
 			TreeNode(int[] cases)
 			{
 				int size = Array.getLength(cases);
-							
+				testCases = new int[size];			
 				for(int i=0; i<Array.getLength(cases); i++)
 					testCases[i] = cases[i];
 			}
@@ -155,26 +160,86 @@ public class ID3
 			
 			void findSplitAttribute() //Find the best splitAttribute - using Information Gain theory.
 			{
-				float max = Float.MIN_VALUE;
+				float max = Long.MIN_VALUE;
 				float val;
-				int finalAttribute = -1, attribute;
-				
+				int finalAttribute = -1, attr;
 				ListIterator lIt = unusedAttr.listIterator();
 				
 				while(lIt.hasNext())
 				{
-					attribute = new Integer(lIt.next().toString()).intValue();
-					val = getInformationGain(testCases, attribute);
+					attr = new Integer(lIt.next().toString()).intValue();
+					val = getInformationGain(testCases, attr);
 					if (val>max)
 					{
 						max = val;
-						finalAttribute = attribute;
+						finalAttribute = attr;
 					}
 				}
 				
 				splitAttribute = finalAttribute;
 			}
 			
+		}
+		
+		//private BufferedImage bi;
+		
+		/*public void drawDecisionTree(String outFile) throws FileNotFoundException, IOException //Draw Decision Tree to file.
+		{
+			outFile = outFile.concat(".png");
+			File f = new File(outFile);
+			
+			if(!f.exists())
+				f.createNewFile();
+			
+		}*/
+		
+		public String getOutput(String str) //Output a class label based on decisiontree.
+		{
+			String[] inStr = str.split(",");
+			int i;
+			
+			if(Array.getLength(inStr) != n)
+			{
+				System.out.println("Invalid input String - Check if the number of provided parameters are correct");
+				return null;
+			}
+				
+			if(root == null)
+			{
+				System.out.println("Training has to be performed first");
+				return null;
+			}
+			
+			boolean found = false;
+			TreeNode temp = root;
+			
+			while(temp.childPtr != null)
+			{
+						found = false;
+						for(i=0; i<Array.getLength(temp.childPtr); i++)
+						{
+							if (temp.childPtr[i].parentLabel.compareTo(inStr[temp.splitAttribute]) == 0)
+							{
+								temp = temp.childPtr[i];
+								found = true;
+								break;
+							}
+						}
+						
+						if(!found)
+						{
+							System.out.println("Invalid value for the "+temp.splitAttribute+" attribute");
+							return null;
+						}
+			}
+			
+			TreeSet ts = getInstances(temp.testCases, n);
+			//if (ts.size() == 1)
+				return ts.first().toString();
+			//else
+			//{has to be completed
+			//}
+									
 		}
 		
 		public void createDecisionTree() throws FileNotFoundException, IOException //Build Decision Tree for input.
@@ -188,7 +253,7 @@ public class ID3
                 int i, j, lineCount = 0;
                 for(i=0; i<n; i++)
 					unusedAttr.add(new Integer(i));
-                
+                                
                 input = new String[t][n+1];
                 String line;
                 
@@ -210,6 +275,7 @@ public class ID3
                 //Start constructing the tree.
                 Stack<TreeNode> treeStack = new Stack<TreeNode>();
                 TreeNode node = new TreeNode(cases);
+                root = node;
                 node.parentPtr = null;
                 TreeSet tempSet;
                 ArrayList tempList;
@@ -226,18 +292,18 @@ public class ID3
 										
 					tempNode.findSplitAttribute();
 					unusedAttr.remove(new Integer(tempNode.splitAttribute));
-										
+					
 					tempSet = getInstances(tempNode.testCases, tempNode.splitAttribute);
 					tempSize = tempSet.size();
 					tempNode.childPtr = new TreeNode [tempSize]; //Create as many child nodes as there are categories in the splitAttribute.					
 					
-					for(i=0; i<t; i++) 
+					for(i=0; i<tempSize; i++) 
 					{
 							tempList = new ArrayList();
-							for(j=0; j<t; j++)
+							for(j=0; j<Array.getLength(tempNode.testCases); j++)
 							{
-								if (input[j][n] == tempSet.first())
-									tempList.add(j);
+								if (input[tempNode.testCases[j]][tempNode.splitAttribute].compareTo(tempSet.first().toString()) == 0)
+									tempList.add(tempNode.testCases[j]);
 							}
 							
 							tempArray = new int[tempList.size()];
@@ -247,6 +313,8 @@ public class ID3
 								
 							
 							TreeNode tempNode2 = new TreeNode(tempArray);
+							tempNode2.parentLabel = tempSet.first().toString();
+							tempNode.childPtr[i] = tempNode2;
 							tempNode2.parentPtr = tempNode;
 							treeStack.push(tempNode2);
 							tempSet.remove(tempSet.first());
