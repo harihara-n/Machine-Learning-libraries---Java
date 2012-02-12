@@ -29,15 +29,16 @@ public class ID3
 		private static String fileName;
 		private static TreeNode root;
 		private static LinkedList unusedAttr = new LinkedList();
-		private static int gObjectX = 1800;
-		private static int gObjectY = 1000;
-		private static int nodeDiameter = 60;
-		private static int minX = gObjectY, maxX = 0;
+		private static int gObjectX;
+		private static int gObjectY;
+		private static int nodeDiameter;
+		private static int minX = Integer.MAX_VALUE, maxX = 0, maxY=0;
+		private static int numColors = 9;
+		private static int legendX;
+		private static int legendY;
 			
 		private static Graphics gObject;
 		
-		
-				
 		public ID3(String fName, int numAttributes, int testCases)
 		{
 			fileName = fName;
@@ -150,6 +151,26 @@ public class ID3
 			
 		}
 		
+		private Color getNodeColor(int attr) //get the node color depending upon its splitAttribute.
+		{
+			Color nodeColor;
+			switch(attr)
+			{
+				case 0: nodeColor = Color.BLUE; break;
+				case 1: nodeColor = Color.YELLOW; break;
+				case 2: nodeColor = Color.RED; break;
+				case 3: nodeColor = Color.GREEN; break;
+				case 4: nodeColor = Color.CYAN; break;
+				case 5: nodeColor = Color.PINK; break;
+				case 6: nodeColor = Color.GRAY; break;
+				case 7: nodeColor = Color.ORANGE; break;
+				case 8: nodeColor = Color.MAGENTA; break;
+				default: nodeColor = Color.BLACK;
+			}
+			
+			return nodeColor;
+		}
+		
 		/*private void buildNodeMap(TreeNode rootNode)
 		{
 			int hmKey, hmValue;
@@ -235,6 +256,9 @@ public class ID3
 						
 					if(maxX < node.childPtr[i].posX)
 						maxX = node.childPtr[i].posX;
+						
+					if(maxY < node.childPtr[i].posY)
+						maxY = node.childPtr[i].posY;
 					
 					//gObject.drawLine(node.posX + (nodeDiameter/2), node.posY + (nodeDiameter/2), node.childPtr[i].posX + (nodeDiameter/2), node.childPtr[i].posY+(nodeDiameter/2));	
 					findNodesPosition(node.childPtr[i]);
@@ -244,10 +268,32 @@ public class ID3
 		
 		private void drawNode(TreeNode node, int translate)
 		{
+			String legendEntry;
+			
 			gObject.drawOval(node.posX, node.posY, nodeDiameter, nodeDiameter);
-
+			
 			if(node.childPtr == null)
 				return;
+				
+			Color nodeColor = getNodeColor(node.splitAttribute%numColors);
+			int numBrighter = node.splitAttribute/numColors;
+			
+			while(numBrighter>0)
+			{
+					nodeColor = nodeColor.brighter();
+					numBrighter--;
+			}
+			
+			gObject.setColor(nodeColor);
+			gObject.fillOval(node.posX-1, node.posY-1, nodeDiameter+1, nodeDiameter+1);
+			
+			gObject.drawOval(legendX, legendY, nodeDiameter*2/3, nodeDiameter*2/3); //Fill in the legend entry.
+			gObject.fillOval(legendX-1, legendY-1, nodeDiameter*2/3, nodeDiameter*2/3);
+			gObject.setColor(Color.WHITE);
+			legendEntry = new String("Attr.#").concat(new Integer(node.splitAttribute +1).toString());
+			gObject.drawString(legendEntry, legendX + (nodeDiameter*3/2), legendY+(nodeDiameter/2));
+			
+			legendY += (nodeDiameter*3/2);			
 			
 			for(int i=0; i<Array.getLength(node.childPtr); i++)
 			{
@@ -261,8 +307,13 @@ public class ID3
 		public void drawDecisionTree(String outFile, int NodeSize) throws FileNotFoundException, IOException //Draw Decision Tree to file.
 		{
 			nodeDiameter = NodeSize;
+			root.posY = 3*nodeDiameter/2;
+			root.posX = 500;
+					
 			outFile = outFile.concat(".png");
 			File f = new File(outFile);
+			
+			Font font = new Font("Arial", Font.PLAIN, 20);
 			
 			int minAdjust = 0;
 			int translate, newCenter;
@@ -271,12 +322,23 @@ public class ID3
 			if(!f.exists())
 				f.createNewFile();
 			
+			findNodesPosition(root);
+			maxX = Math.max(maxX, root.posX);
+			minX = Math.min(minX, root.posX);
+			
+			translate = 5-minX;
+			maxX = translate + maxX;
+						
+			legendX = maxX + (nodeDiameter*3/2);
+			legendY = root.posY;
+			
+			gObjectX = legendX + 8*nodeDiameter;
+			gObjectY = maxY + 2*nodeDiameter; 
 			BufferedImage bImage = new BufferedImage(gObjectX, gObjectY, BufferedImage.TYPE_INT_RGB);
 			gObject = bImage.getGraphics();
+			gObject.setFont(font);
 			
-			findNodesPosition(root);
-			
-			if(maxX > (gObjectX - nodeDiameter)) //If true, then no adjustment required.
+			/*if(maxX > (gObjectX - nodeDiameter)) //If true, then no adjustment required.
 				minAdjust+=1;
 			if(minX < 0)
 				minAdjust+=2;
@@ -293,10 +355,11 @@ public class ID3
 				maxX+=translate; minX+=translate;	
 			}
 			
-			newCenter = (maxX - minX)/2;
+			newCenter = (maxX + minX)/2;
 			
-			translate = translate + (newCenter - (gObjectX/2));
-			root.posX+=translate;
+			if((maxX + (newCenter - (gObjectX/2)) < (gObjectX - nodeDiameter)) && (minX + (newCenter - (gObjectX/2))) > 0)
+				translate = translate + (newCenter - (gObjectX/2));*/
+			root.posX += translate;
 			drawNode(root, translate);
 			ImageIO.write(bImage, "png", f);
 				
@@ -398,8 +461,6 @@ public class ID3
                 Stack<TreeNode> treeStack = new Stack<TreeNode>();
                 TreeNode node = new TreeNode(cases);
                 root = node;
-                root.posX = gObjectX/2; 
-                root.posY = 3*nodeDiameter/2;
                 root.depthNode = 1;
                 //nodeMap.put(1,1);
 
