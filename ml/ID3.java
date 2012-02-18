@@ -520,6 +520,8 @@ public class ID3
 				}
          }
          
+         public void pruneDecisionTree(int validationSize) //Prunes the decision tree based on the first 
+         
          private class TreeNode //Decision Tree data structure.
 		{
 			int[] testCases;
