@@ -8,14 +8,8 @@ import java.lang.reflect.Array;
 import java.lang.Integer;
 import java.lang.Long;
 import java.lang.Math;
-import java.util.TreeSet;
-import java.util.LinkedList;
-import java.util.HashMap;
-import java.util.ListIterator;
-import java.util.Iterator;
-import java.util.Collection;
-import java.util.Stack;
-import java.util.ArrayList;
+import java.lang.NumberFormatException;
+import java.util.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.awt.*;
@@ -25,8 +19,11 @@ import javax.imageio.ImageIO;
 public class ID3
 {
 		private static String[][]input;
+		private static String[] inputTest;
 		private static int n,t; //number of attributes and number of test_cases;
+		private static int valSize;
 		private static String fileName;
+		private static String[] firstLine;
 		private static TreeNode root;
 		private static LinkedList unusedAttr = new LinkedList();
 		private static int gObjectX;
@@ -36,14 +33,108 @@ public class ID3
 		private static int numColors = 9;
 		private static int legendX;
 		private static int legendY;
-			
+		private static String[] thresholdVal;
+		
+		private static float pessError = (float)0.5; //pessimistic error for post pruning.
+				
 		private static Graphics gObject;
 		
-		public ID3(String fName, int numAttributes, int testCases)
+		public ID3(String fName, int numAttributes, int testCases, String delimiter) throws IOException, FileNotFoundException
 		{
 			fileName = fName;
 			n = numAttributes;
 			t = testCases;
+					
+			FileInputStream fstream = new FileInputStream(fileName);
+            DataInputStream in = new DataInputStream(fstream);
+            
+            //Parse the first line to see if continuous or discrete attributes. 
+            firstLine = new String[n];
+            firstLine = in.readLine().split(delimiter);
+                
+            int i, j, lineCount = 0;
+                         
+            for(i=0; i<n; i++)
+				unusedAttr.add(new Integer(i));
+                                
+            input = new String[t][n+1];
+            String line;
+            
+            int invalidLines = 0;    
+            while((lineCount + invalidLines)<t)
+            {
+				try
+				{
+					input[lineCount] = (in.readLine()).split(delimiter);
+				}
+				catch(NullPointerException e)
+				{
+					invalidLines++;continue;
+				}
+				if (Array.getLength(input[lineCount]) != n+1) //number of attributes provided in the line is incorrect. 
+				{
+					invalidLines++;continue;
+				}
+				lineCount++;	
+				
+            }
+            
+            
+            if (invalidLines > 0)
+				System.out.println("Not Considering "+invalidLines+" invalid training cases");
+				
+			t = testCases - invalidLines;	
+			thresholdVal = new String[n];
+            
+            for(i=0; i<n; i++)
+            {
+				if(firstLine[i].compareTo("c") == 0) //Continuous Attribute
+					thresholdVal[i] = calculateThreshold(i);
+				else if(firstLine[i].compareTo("d") != 0)
+				{
+					System.out.println("Invalid first line - Training data (it should specify if the attributes are c or d)");
+					System.exit(1);
+				}
+			}
+			
+			for(i=0; i<t; i++)
+			{
+				for(j=0; j<n; j++)
+				{
+					if(firstLine[j].compareTo("c") == 0)
+					{
+						input[i][j] = makeContinuous(input[i][j], j);
+					}
+				}
+						
+			}
+		}	
+		
+		public float findAccuracy(String fTestName, int validationSize, String delim) throws IOException, FileNotFoundException
+		{
+			valSize = validationSize;
+			
+			FileInputStream fstreamTest = new FileInputStream(fTestName);
+            DataInputStream inTest = new DataInputStream(fstreamTest);
+            
+            int lineCount = 0, correct = 0;
+            inputTest = new String[valSize];
+            
+            String tempInput;
+            
+            while(lineCount < validationSize)
+            {
+					inputTest[lineCount] = inTest.readLine();
+					
+					
+					if ((Array.get(inputTest[lineCount].split(delim), n).toString()).compareTo(getOutput(inputTest[lineCount])) == 0)
+						correct++;
+					
+					lineCount++;
+			}
+			
+			return (float)correct/(float)valSize;			
+			
 		}
 		
 		private int countInstances (int[] testCases, int attributeIndex) //Counts the number of unique values of a particular attribute over the given testcases. 
@@ -51,8 +142,10 @@ public class ID3
 			TreeSet ts = new TreeSet();
 			
 			for(int i = 0; i<Array.getLength(testCases); i++)
-				ts.add(input[testCases[i]][attributeIndex]);
-			
+			{
+				if(input[testCases[i]][attributeIndex].compareTo("?") != 0)
+					ts.add(input[testCases[i]][attributeIndex]);
+			}
 			return ts.size();		
 		}
 		
@@ -63,6 +156,8 @@ public class ID3
 			
 			for(int i = 0; i<Array.getLength(testCases); i++)
 			{
+				if(input[testCases[i]][attributeIndex].compareTo("?") == 0)
+					continue;
 				if (instMap.containsKey(input[testCases[i]][attributeIndex]))
 				{
 					occ = instMap.remove(input[testCases[i]][attributeIndex]);
@@ -74,6 +169,28 @@ public class ID3
 			
 			return instMap;
 		}
+		
+		private String maxOutputLabel(TreeNode node)
+		{
+			HashMap<String, Integer> instMap = getInstances(node.testCases, n);
+			
+			Iterator it = instMap.keySet().iterator();
+			Integer max = Integer.MIN_VALUE, val;
+			String answer = ""; String label;
+			while(it.hasNext())
+			{
+				label = it.next().toString();
+				val = instMap.get(label);
+				
+				if (val.compareTo(max) > 0)
+				{
+					max = val;
+					answer = label;
+				}
+			}
+			return answer;
+		}
+			
 		
 		private float getEntropy(int[] testCases)//Calculate the entropy of the given testCases. 
 		{
@@ -119,6 +236,9 @@ public class ID3
 			{
 				classLabel = input[testCases[i]][attributeIndex];
 				
+				if(classLabel.compareTo("?") == 0)
+					continue;
+				
 				if(hMap.containsKey(classLabel))
 				{
 					indexes = hMap.get(classLabel).toString();
@@ -151,6 +271,34 @@ public class ID3
 			
 		}
 		
+		private double getChiSquareValue (int dof) //Chi-Squared values for pre-pruning (threshold).
+		{
+			switch(dof)
+			{
+				case 1: return 3.841;
+				case 2: return 5.991;
+				case 3: return 7.815;
+				case 4: return 9.488;
+				case 5: return 11.070;
+				case 6: return 12.592;
+				case 7: return 14.067;
+				case 8: return 15.507;
+				case 9: return 16.919;
+				case 10: return 18.307;
+				case 11: return 19.675;
+				case 12: return 21.026;
+				case 13: return 22.362;
+				case 14: return 23.685;
+				case 15: return 24.996;
+				case 16: return 26.296;
+				case 17: return 27.587;
+				case 18: return 28.869;
+				case 19: return 30.144;
+				case 20: return 31.410;
+				default: return (3*dof)/2;
+			}
+		}
+		
 		private Color getNodeColor(int attr) //get the node color depending upon its splitAttribute.
 		{
 			Color nodeColor;
@@ -171,66 +319,8 @@ public class ID3
 			return nodeColor;
 		}
 		
-		/*private void buildNodeMap(TreeNode rootNode)
-		{
-			int hmKey, hmValue;
-			while(rootNode.childPtr != null)
-			{
-				for(int i=0; i<Array.getLength(rootNode.childPtr); i++)
-				{
-					hmKey = rootNode.childPtr[i].depthNode;
-					if (nodeMap.containsKey(hmKey))
-					{
-						hmValue = nodeMap.get(hmKey);
-						nodeMap.put(val, hmValue);
-					}
-					else
-						nodeMap.put(hmKey, 1);
-						
-					buildNodeMap(rootNode.childPtr[i]);
-				}
-			}
-		}
-		
-		private int getWidthTree(int depth) //Returns the maximum width in the tree.
-		{
-				buildNodeMap(root);
-				int max = 0, val;
-				
-				for(int i=1; i<=depth; i++)
-				{
-					val = nodeMap.get(i);
-					
-					if(val > max)
-						max = val;
-				}
-				
-				return max;
-		}
-		
-		private int getDepthTree (TreeNode rootNode) //Returns the depth of the tree
-		{
-			int max = rootNode.depthNode, val;
-			
-			while(rootNode.childPtr != null)
-			{
-				for(int i=0; i<Array.getLength(rootNode.childPtr); i++)
-				{
-					val = getDepthTree(rootNode.childPtr[i]);
-					
-					if (val > max)
-						max = val;
-				}
-			}
-			
-			return max;
-			
-		}*/
-		
-				
 		private void findNodesPosition (TreeNode node) //Calculate the node positions.
 		{
-				//gObject.drawOval(node.posX, node.posY, nodeDiameter, nodeDiameter);
 				if (node.childPtr == null)
 					return;
 				int childSize = Array.getLength(node.childPtr);
@@ -260,7 +350,6 @@ public class ID3
 					if(maxY < node.childPtr[i].posY)
 						maxY = node.childPtr[i].posY;
 					
-					//gObject.drawLine(node.posX + (nodeDiameter/2), node.posY + (nodeDiameter/2), node.childPtr[i].posX + (nodeDiameter/2), node.childPtr[i].posY+(nodeDiameter/2));	
 					findNodesPosition(node.childPtr[i]);
 				}
 					
@@ -338,27 +427,6 @@ public class ID3
 			gObject = bImage.getGraphics();
 			gObject.setFont(font);
 			
-			/*if(maxX > (gObjectX - nodeDiameter)) //If true, then no adjustment required.
-				minAdjust+=1;
-			if(minX < 0)
-				minAdjust+=2;
-				
-			if(minAdjust == 0 || minAdjust == 3) //Do no translation.
-				translate = 0; 
-			else
-			{
-				if(minAdjust == 1)
-					translate = -(maxX-(gObjectX-nodeDiameter));
-				else
-					translate = minX;
-					
-				maxX+=translate; minX+=translate;	
-			}
-			
-			newCenter = (maxX + minX)/2;
-			
-			if((maxX + (newCenter - (gObjectX/2)) < (gObjectX - nodeDiameter)) && (minX + (newCenter - (gObjectX/2))) > 0)
-				translate = translate + (newCenter - (gObjectX/2));*/
 			root.posX += translate;
 			drawNode(root, translate);
 			ImageIO.write(bImage, "png", f);
@@ -367,13 +435,21 @@ public class ID3
 		
 		public String getOutput(String str) //Output a class label based on decisiontree.
 		{
-			String[] inStr = str.split(",");
+			String[] inStr = new String[n];
+			inStr = str.split(",");
+			
 			int i;
 			
-			if(Array.getLength(inStr) != n)
+			for(i=0; i<n; i++)
 			{
-				System.out.println("Invalid input String - Check if the number of provided parameters are correct");
-				return null;
+				if(inStr[i] == null)
+				{
+					System.out.println("Invalid Test String");
+					return null;
+				}
+				
+				if(firstLine[i].compareTo("c") == 0)
+					inStr[i] = makeContinuous(inStr[i], i);
 			}
 				
 			if(root == null)
@@ -400,8 +476,7 @@ public class ID3
 						
 						if(!found)
 						{
-							System.out.println("Invalid value for the "+temp.splitAttribute+" attribute");
-							return null;
+							return maxOutputLabel(temp);
 						}
 			}
 			
@@ -427,32 +502,91 @@ public class ID3
 									
 		}
 		
-		public void createDecisionTree() throws FileNotFoundException, IOException //Build Decision Tree for input.
+		private String makeContinuous(String value, int attrIndex)
+		{
+			String threshold = thresholdVal[attrIndex];
+			
+			if(value.compareTo(threshold) <= 0)
+				return "1";
+			else
+				return "2";
+		}	
+		
+		private String calculateThreshold(int attrIndex)
+		{
+			ArrayList<BigDecimal> al = new ArrayList<BigDecimal>();
+			int i,j;	
+			BigDecimal val;
+			
+			for(i=0; i<t; i++)
+			{
+				if (input[i][attrIndex].compareTo("?")==0)
+					continue;
+				try
+				{
+					val = new BigDecimal(input[i][attrIndex]);
+					al.add(val);
+				}
+				catch(NumberFormatException e)
+				{
+					//System.out.println(input[i][attrIndex]);
+					System.out.println("Continuous attribute values should be real numbers");
+					System.exit(0);
+				}
+				
+			}
+			
+			Collections.sort(al);
+			
+			BigDecimal threshold = al.get((al.size()-1)/2);
+			return threshold.toString();
+						
+		}
+		
+		public void postPruneTree() //Postpruning
+		{
+			int wrongCases, i;
+			
+			if(root == null)
+			{
+				System.out.println("First construct the tree before post-pruning");
+				System.exit(1);
+			}
+			
+			TreeNode node = root;
+			Stack<TreeNode> nodeStack = new Stack();
+			nodeStack.push(node);
+			
+			while(!nodeStack.empty())
+			{
+				TreeNode tempNode = nodeStack.pop();
+				if(tempNode.childPtr == null)
+					continue;
+				
+				wrongCases = Array.getLength(tempNode.testCases) - (getInstances(tempNode.testCases, n).get(tempNode.maxLabel));
+				float preSplitError = (float)(wrongCases + pessError)/(float)Array.getLength(tempNode.testCases);
+				float postSplitError = 0;
+				
+				wrongCases = 0;
+				
+				for(i=0; i<Array.getLength(tempNode.childPtr); i++)
+					wrongCases = wrongCases + Array.getLength(tempNode.childPtr[i].testCases) - (getInstances(tempNode.childPtr[i].testCases, n).get(tempNode.childPtr[i].maxLabel)); ;
+					
+				postSplitError = (float)(wrongCases + (float)(pessError*i))/(float)Array.getLength(tempNode.testCases);
+				
+				if(postSplitError > preSplitError)
+				{
+						tempNode.childPtr = null; continue;
+				}
+				
+				for(i=0; i<Array.getLength(tempNode.childPtr); i++)
+						nodeStack.push(tempNode.childPtr[i]);
+			}
+		}
+		
+		public void createDecisionTree(boolean isPrePruning) //Build Decision Tree for input.
         {
-                FileInputStream fstream = new FileInputStream(fileName);
-                DataInputStream in = new DataInputStream(fstream);
-                
-                //Parse the first line to see if continuous or discrete attributes. 
-                //To be done later.
- 
-                int i, j, lineCount = 0;
-                for(i=0; i<n; i++)
-					unusedAttr.add(new Integer(i));
-                                
-                input = new String[t][n+1];
-                String line;
-                
-                while(lineCount<t)
-                {
-					input[lineCount] = (in.readLine()).split(",");
-					if (Array.getLength(input[lineCount]) != n+1) //number of attributes provided in the line is incorrect. 
-					{
-						System.out.println("Invalid data entry");
-						System.exit(0);
-					}	
-					lineCount++;
-                }
-                
+                int i,j;                
                 int[] cases = new int[t];
                 for(i=0;i<t;i++)
 					cases[i] = i;
@@ -462,12 +596,12 @@ public class ID3
                 TreeNode node = new TreeNode(cases);
                 root = node;
                 root.depthNode = 1;
-                //nodeMap.put(1,1);
-
-                
-                node.parentPtr = null;
+                              
+                root.parentPtr = null;
+                root.maxLabel = maxOutputLabel(root);
                 HashMap<String, Integer> tempMap;
-                Iterator<String> tempIt;
+                Iterator<String> tempIt, tempIt2;
+                String mostCommonLabel = "";
                 
                 ArrayList tempList;
                 int tempSize;
@@ -481,27 +615,63 @@ public class ID3
 					
 					if(countInstances(tempNode.testCases, n) == 1)
 						continue;
-										
+						
 					tempNode.findSplitAttribute();
 					unusedAttr.remove(new Integer(tempNode.splitAttribute));
 					
 					tempMap = getInstances(tempNode.testCases, tempNode.splitAttribute);
 					tempSize = tempMap.size();
+					
+					tempIt2 = tempMap.keySet().iterator();
+					int max = 0, val; String key;
+					
+					if(isPrePruning)
+					{
+						float chiSquareThreshold = (float)getChiSquareValue((countInstances(tempNode.testCases,n)-1)*(countInstances(tempNode.testCases,tempNode.splitAttribute)));
+						float chiSquare = 1;
+										
+						tempIt2 = tempMap.keySet().iterator();
+						while(tempIt2.hasNext())
+							chiSquare = (chiSquare*(tempMap.get(tempIt2.next())))/(float)(Array.getLength(tempNode.testCases));
+												
+						chiSquare = chiSquare*(float)(Array.getLength(tempNode.testCases));
+						
+						if(chiSquare < chiSquareThreshold) //Stop expanding the node further - Statistically split is not significant.
+							continue;
+					}
+					
+					while(tempIt2.hasNext())
+					{
+						key = tempIt2.next();
+						val = tempMap.get(key);
+						if(max < val)
+						{
+							max = val;
+							mostCommonLabel = key;
+						}
+					} 
+					
 					tempNode.childPtr = new TreeNode [tempSize]; //Create as many child nodes as there are categories in the splitAttribute.					
 					tempIt = tempMap.keySet().iterator();
 
-					
 					for(i=0; i<tempSize; i++) 
 					{
 							tempList = new ArrayList();
 							label = tempIt.next();
-
+							
 							for(j=0; j<Array.getLength(tempNode.testCases); j++)
 							{
+								if(input[tempNode.testCases[j]][tempNode.splitAttribute].compareTo("?") == 0)
+								{
+									if (label.compareTo(mostCommonLabel) == 0)
+										tempList.add(tempNode.testCases[j]);
+									continue;	
+								}		
+								    
 								if (input[tempNode.testCases[j]][tempNode.splitAttribute].compareTo(label) == 0)
 									tempList.add(tempNode.testCases[j]);
 							}
-							
+								
 							tempArray = new int[tempList.size()];
 							
 							for(j=0; j<tempList.size(); j++)
@@ -510,20 +680,22 @@ public class ID3
 							
 							TreeNode tempNode2 = new TreeNode(tempArray);
 							tempNode2.parentLabel = label;
+							tempNode2.maxLabel = maxOutputLabel(tempNode2);
+
+							//System.out.println(label);
 							tempNode2.depthNode = tempNode.depthNode + 1;
 							tempNode.childPtr[i] = tempNode2;
 							tempNode2.parentPtr = tempNode;
 							treeStack.push(tempNode2);
-							
 					}
 										
 				}
          }
          
-         public void pruneDecisionTree(int validationSize) //Prunes the decision tree based on the first 
+         //public void pruneDecisionTree(int validationSize) Prunes the decision tree based on the first 
          
          private class TreeNode //Decision Tree data structure.
-		{
+		 {
 			int[] testCases;
 			int splitAttribute;
 			
@@ -534,6 +706,7 @@ public class ID3
 			TreeNode parentPtr;
 			
 			String parentLabel;
+			String maxLabel;
 			
 			TreeNode(int[] cases)
 			{
