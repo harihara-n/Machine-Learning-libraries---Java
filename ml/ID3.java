@@ -22,6 +22,7 @@ public class ID3
 		private static String[] inputTest;
 		private static int n,t; //number of attributes and number of test_cases;
 		private static int valSize;
+		private static int maxDepthNode = 1;
 		private static String fileName;
 		private static String[] firstLine;
 		private static TreeNode root;
@@ -71,7 +72,7 @@ public class ID3
 				{
 					invalidLines++;continue;
 				}
-				if (Array.getLength(input[lineCount]) != n+1) //number of attributes provided in the line is incorrect. 
+				if (Array.getLength(input[lineCount]) != n+1 || (Array.get(input[lineCount],n).toString().compareTo("?") == 0)) //number of attributes provided in the line is incorrect. 
 				{
 					invalidLines++;continue;
 				}
@@ -79,7 +80,11 @@ public class ID3
 				
             }
             
-            
+            if(invalidLines == lineCount)
+            {
+				System.out.println("All lines invalid - Check the supplied attribute number");
+				System.exit(0);
+			}
             if (invalidLines > 0)
 				System.out.println("Not Considering "+invalidLines+" invalid training cases");
 				
@@ -117,15 +122,21 @@ public class ID3
 			FileInputStream fstreamTest = new FileInputStream(fTestName);
             DataInputStream inTest = new DataInputStream(fstreamTest);
             
-            int lineCount = 0, correct = 0;
+            int lineCount = 0, correct = 0, ignoreLines = 0;
             inputTest = new String[valSize];
             
             String tempInput;
             
-            while(lineCount < validationSize)
+            while(lineCount < valSize)
             {
 					inputTest[lineCount] = inTest.readLine();
 					
+					if(Array.get(inputTest[lineCount].split(delim),n).toString().compareTo("?") == 0)
+					{
+						lineCount++;
+						ignoreLines++;
+						continue;
+					}
 					
 					if ((Array.get(inputTest[lineCount].split(delim), n).toString()).compareTo(getOutput(inputTest[lineCount])) == 0)
 						correct++;
@@ -133,7 +144,7 @@ public class ID3
 					lineCount++;
 			}
 			
-			return (float)correct/(float)valSize;			
+			return (float)correct/(float)(valSize - ignoreLines);			
 			
 		}
 		
@@ -218,7 +229,7 @@ public class ID3
 			
 			while(hIt.hasNext())
 			{
-				fraction = new BigDecimal(hIt.next().toString()).divide(new BigDecimal(Array.getLength(testCases)), 2, RoundingMode.HALF_DOWN);
+				fraction = new BigDecimal(hIt.next().toString()).divide(new BigDecimal(Array.getLength(testCases)), 10, RoundingMode.HALF_DOWN);
 				fraction = fraction.multiply(new BigDecimal(Math.log(fraction.doubleValue())));
 				answer = answer.add(fraction.negate());
 			}
@@ -332,14 +343,16 @@ public class ID3
 						mid = (float)(childSize-1)/2;
 				}
 				
+				int widthVal = maxDepthNode - node.depthNode + 1;
+				
 				for(int i=0; i<childSize; i++)
 				{
 					node.childPtr[i].posY = node.posY + 2*nodeDiameter;
 					
 					if (isEven)
-						node.childPtr[i].posX = (int)(((float)i - mid)*2*nodeDiameter) + (node.posX);
+						node.childPtr[i].posX = (int)(((float)i - mid)*widthVal*nodeDiameter) + (node.posX);
 					else
-						node.childPtr[i].posX = ((i-(childSize/2))*2*nodeDiameter) + (node.posX);
+						node.childPtr[i].posX = ((i-(childSize/2))*widthVal*nodeDiameter) + (node.posX);
 					
 					if(minX > node.childPtr[i].posX)
 						minX = node.childPtr[i].posX;
@@ -349,7 +362,7 @@ public class ID3
 						
 					if(maxY < node.childPtr[i].posY)
 						maxY = node.childPtr[i].posY;
-					
+						
 					findNodesPosition(node.childPtr[i]);
 				}
 					
@@ -360,16 +373,17 @@ public class ID3
 			String legendEntry;
 			
 			gObject.drawOval(node.posX, node.posY, nodeDiameter, nodeDiameter);
-			
+						
 			if(node.childPtr == null)
 				return;
 				
 			Color nodeColor = getNodeColor(node.splitAttribute%numColors);
 			int numBrighter = node.splitAttribute/numColors;
+			numBrighter = numBrighter*3;
 			
 			while(numBrighter>0)
 			{
-					nodeColor = nodeColor.brighter();
+					nodeColor = nodeColor.darker();
 					numBrighter--;
 			}
 			
@@ -614,7 +628,10 @@ public class ID3
 					TreeNode tempNode = treeStack.pop();
 					
 					if(countInstances(tempNode.testCases, n) == 1)
+					{
+						tempNode.childPtr = null;
 						continue;
+					}
 						
 					tempNode.findSplitAttribute();
 					unusedAttr.remove(new Integer(tempNode.splitAttribute));
@@ -684,6 +701,8 @@ public class ID3
 
 							//System.out.println(label);
 							tempNode2.depthNode = tempNode.depthNode + 1;
+							if(tempNode2.depthNode > maxDepthNode)
+								maxDepthNode = tempNode2.depthNode;
 							tempNode.childPtr[i] = tempNode2;
 							tempNode2.parentPtr = tempNode;
 							treeStack.push(tempNode2);
