@@ -34,25 +34,29 @@ public class ID3
 		private static int numColors = 9;
 		private static int legendX;
 		private static int legendY;
-		private static String[] thresholdVal;
+		private static int numSplits;
+		private static int maxSplits = 10;
+		private static String[][] thresholdVal;
 		
 		private static float pessError = (float)0.5; //pessimistic error for post pruning.
 				
 		private static Graphics gObject;
 		
-		public ID3(String fName, int numAttributes, int testCases, String delimiter) throws IOException, FileNotFoundException
+		public ID3(String fName, int numAttributes, int testCases, String delimiter, int limitSplits) throws IOException, FileNotFoundException
 		{
 			fileName = fName;
 			n = numAttributes;
 			t = testCases;
+			numSplits = limitSplits;
 					
 			FileInputStream fstream = new FileInputStream(fileName);
             DataInputStream in = new DataInputStream(fstream);
             
             //Parse the first line to see if continuous or discrete attributes. 
             firstLine = new String[n];
+            
             firstLine = in.readLine().split(delimiter);
-                
+            
             int i, j, lineCount = 0;
                          
             for(i=0; i<n; i++)
@@ -80,7 +84,7 @@ public class ID3
 				
             }
             
-            if(invalidLines == lineCount)
+            if(invalidLines == t)
             {
 				System.out.println("All lines invalid - Check the supplied attribute number");
 				System.exit(0);
@@ -88,13 +92,37 @@ public class ID3
             if (invalidLines > 0)
 				System.out.println("Not Considering "+invalidLines+" invalid training cases");
 				
+			if(numSplits > maxSplits || numSplits > (t/2))
+			{
+				System.out.println("numSplits should be less than or equal to "+Math.min(t/2,limitSplits));
+				System.exit(1);
+			}
+				
 			t = testCases - invalidLines;	
-			thresholdVal = new String[n];
-            
+			
+			thresholdVal = new String[n][numSplits - 1];
+			
+			boolean allCont = false;
+			if(Array.getLength(firstLine) == 1)
+			{
+				if(firstLine[0].compareTo("c") == 0)
+					allCont = true;
+				else if(firstLine[0].compareTo("d") == 0)
+					return;
+				else
+				{
+					System.out.println("Invalid first line - it should be c or d");
+					System.exit(1);
+				}
+			}
+			          
             for(i=0; i<n; i++)
             {
-				if(firstLine[i].compareTo("c") == 0) //Continuous Attribute
-					thresholdVal[i] = calculateThreshold(i);
+				if(allCont || firstLine[i].compareTo("c") == 0) //Continuous Attribute
+				{
+					for(j=0; j<numSplits-1; j++)
+						thresholdVal[i][j] = calculateThreshold(i,j);
+				}
 				else if(firstLine[i].compareTo("d") != 0)
 				{
 					System.out.println("Invalid first line - Training data (it should specify if the attributes are c or d)");
@@ -106,10 +134,9 @@ public class ID3
 			{
 				for(j=0; j<n; j++)
 				{
-					if(firstLine[j].compareTo("c") == 0)
-					{
+					if(allCont || firstLine[j].compareTo("c") == 0)
 						input[i][j] = makeContinuous(input[i][j], j);
-					}
+					
 				}
 						
 			}
@@ -330,8 +357,34 @@ public class ID3
 			return nodeColor;
 		}
 		
+		public int returnNumNodes()
+		{
+			int count = 0;
+			TreeNode temp;
+			Stack<TreeNode> stNode = new Stack<TreeNode>();
+			stNode.push(root);
+			
+			while(!stNode.isEmpty())
+			{
+				temp = stNode.pop();
+				count++;
+				
+				if(temp.childPtr == null)
+					continue;
+				else
+				{
+					for(int i=0; i<Array.getLength(temp.childPtr); i++)
+						stNode.push(temp.childPtr[i]);
+				}
+			}
+			
+			return count;	
+				
+		}
+		
 		private void findNodesPosition (TreeNode node) //Calculate the node positions.
 		{
+				int widthVal = 0;
 				if (node.childPtr == null)
 					return;
 				int childSize = Array.getLength(node.childPtr);
@@ -343,7 +396,8 @@ public class ID3
 						mid = (float)(childSize-1)/2;
 				}
 				
-				int widthVal = maxDepthNode - node.depthNode + 1;
+				if(childSize != 0)
+					widthVal = 2*(maxDepthNode - node.depthNode + 1)/childSize;
 				
 				for(int i=0; i<childSize; i++)
 				{
@@ -518,15 +572,16 @@ public class ID3
 		
 		private String makeContinuous(String value, int attrIndex)
 		{
-			String threshold = thresholdVal[attrIndex];
+			for(int i=0; i<numSplits-1; i++)
+			{
+				if (value.compareTo(thresholdVal[attrIndex][i]) <= 0)
+					return new Integer(i+1).toString();
+			}
 			
-			if(value.compareTo(threshold) <= 0)
-				return "1";
-			else
-				return "2";
+			return new Integer(numSplits).toString();
 		}	
 		
-		private String calculateThreshold(int attrIndex)
+		private String calculateThreshold(int attrIndex, int splitPortion)
 		{
 			ArrayList<BigDecimal> al = new ArrayList<BigDecimal>();
 			int i,j;	
@@ -538,7 +593,7 @@ public class ID3
 					continue;
 				try
 				{
-					val = new BigDecimal(input[i][attrIndex]);
+					val = new BigDecimal(input[i][attrIndex].trim());
 					al.add(val);
 				}
 				catch(NumberFormatException e)
@@ -552,7 +607,7 @@ public class ID3
 			
 			Collections.sort(al);
 			
-			BigDecimal threshold = al.get((al.size()-1)/2);
+			BigDecimal threshold = al.get(((splitPortion+1)*(al.size()-1))/numSplits);
 			return threshold.toString();
 						
 		}
@@ -653,7 +708,7 @@ public class ID3
 												
 						chiSquare = chiSquare*(float)(Array.getLength(tempNode.testCases));
 						
-						if(chiSquare < chiSquareThreshold) //Stop expanding the node further - Statistically split is not significant.
+						if(chiSquare > chiSquareThreshold) //Stop expanding the node further - Statistically split is not significant.
 							continue;
 					}
 					
