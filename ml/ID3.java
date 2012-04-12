@@ -305,7 +305,7 @@ public class ID3
 			}		
 			
 			answer = answer.subtract(new BigDecimal(getEntropy(testCases)));
-			return answer.floatValue();
+			return answer.negate().floatValue();
 			
 		}
 		
