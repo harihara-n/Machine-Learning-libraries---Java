@@ -501,7 +501,7 @@ public class ID3
 				
 		}
 		
-		public String getOutput(String str) //Output a class label based on decisiontree.
+		private String getOutput(String str) //Output a class label based on decisiontree.
 		{
 			String[] inStr = new String[n];
 			inStr = str.split(",");
