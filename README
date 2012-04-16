@@ -9,11 +9,38 @@
   purpose of this package is to enable people to use various classifiers without
   worrying about the internal details.  
 
+  Contents
+  ----------
+  
+  This package will be constantly updated to include libraries for new classifers
+  (as and when I learn them). At the time of last update - it contains the following
+  libraries. I have provided a very concise definition of each classifier - you would be 
+  best advised to refer to tutorials on these, in case you are just starting out. 
+
+       ID3
+      ------ 
+      This is the Iterative Dichotomiser library for creating decision trees from
+      the given dataset. It operates on the concept of Information Gain, which
+      determines the best split attribute based on change in entropy before and
+      after splitting. 
+
+      NeuralNetworks
+     ----------------
+      Neural Networks are software implementation of neurons and their interconnection. 
+      It learns using a technique called backpropagation - that uses gradient descent to
+      identify a state when the Mean squared error of the outputs is at a minimum. 
+
+      KNearestNeighbor
+     -----------------
+      This is a lazy learning approach that operates on the belief that instances that are
+      close to each other have similar class labels.
+                        
+
   Documentation
   -------------
 
-  The documentation for the libraries can be found in the Documentation file inside
-  the same repository. 
+  The documentation for the libraries can be found in the Documentation page of this repo's
+  wiki. 
 
   Licensing
   ---------
