@@ -1,3 +1,31 @@
-The ml (or Machine Learning) package is intended to contain libraries for easily implementing various machine learning algorithms. The ml package is being developed by Harihara K Narayanan, Grad Student at Texas A&M University as part of the Grad level Machine learning course. 
+                        ml - Machine Learning Package
 
-Documentation/Readmes for individual libraries can be found inside. 
+  What is it?
+  -----------
+
+  The ml package contains a list of libraries that can be used for supervised
+  learning. All the libraries are developed in Java. It was developed by me
+  (Harihara Narayanan) as part of my grad class in Machine learning. The main
+  purpose of this package is to enable people to use various classifiers without
+  worrying about the internal details.  
+
+  Documentation
+  -------------
+
+  The documentation for the libraries can be found in the Documentation file inside
+  the same repository. 
+
+  Licensing
+  ---------
+
+  This work is protected by the DBAD license. Refer to http://philsturgeon.co.uk/code/dbad-license. 
+
+  Contacts
+  --------
+
+  For any questions, comments or bug reporting, contact me at hariharakrishnan.n@gmail.com.    
+
+
+
+
+
