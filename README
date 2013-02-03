@@ -4,10 +4,9 @@
   -----------
 
   The ml package contains a list of libraries that can be used for supervised
-  learning. All the libraries are developed in Java. It was developed by me
-  (Harihara Narayanan) as part of my grad class in Machine learning. The main
-  purpose of this package is to enable people to use various classifiers without
-  worrying about the internal details.  
+  learning. All the libraries are developed in Java. The main  purpose of this
+  package is to enable people to use various classifiers without worrying about
+  the internal details.  
 
   Contents
   ----------
